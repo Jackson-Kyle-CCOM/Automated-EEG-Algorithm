@@ -19,7 +19,7 @@ while true
 end
 
 numberOfFolders = length(listOfFolderNames);
-set(0,'DefaultFigureVisible','off')             %Change 'off' to 'on' if you want plotted figures to show, also refer to the last line of code (313)
+set(0,'DefaultFigureVisible','on')             %Change 'off' to 'on' if you want plotted figures to show, also refer to the last line of code (294)
 
 
 % This block of code is where data collecting and processing begins ---------------------------------------
@@ -31,7 +31,7 @@ for k = 1 : numberOfFolders
     numberOfEDFFiles = length(baseFileNames);                               % This counts the number of EDF files present
     
     Summary_Names = {zeros(numberOfEDFFiles,1)};                            % Saves the mouse number for export to excel
-    Summary_Data = zeros(numberOfEDFFiles,3);                               % Saves the mouse spikes/seizures for export to excel
+    Summary_Data = zeros(numberOfEDFFiles,3);                               % Saves the mouse spikes and seizures for export to excel
     
     if numberOfEDFFiles >= 1                                                %This loop scans through all the EDF files and extracts data
 		for f = 1:numberOfEDFFiles
@@ -39,37 +39,18 @@ for k = 1 : numberOfFolders
 			fprintf('\nProcessing EDF file %s \n \n', fullFileName);
             Mouse_Number = erase(baseFileNames(f).name, '.edf');            % This saves the mouse number (e.g. S20, S21, etc.)
             Data = edfread(baseFileNames(f).name,'TimeOutputType','datetime');  % This is where EDF data is brought into matlab
-            Data.Properties.DimensionNames = ["DateTime" "Variables"];  	% Converts EDF data to dd/mm/yyyy - hh/mm/ss format
-            info = edfinfo(baseFileNames(f).name);                         	% Saves parameters for the EDF file
-            Record = 1;                                                  	% EEG Record
+            Data.Properties.DimensionNames = ["DateTime" "Variables"];      % Converts EDF data to dd/mm/yyyy - hh/mm/ss format
+            info = edfinfo(baseFileNames(f).name);                          % Saves parameters for the EDF file
+            Record = 1;                                                     % EEG Record
             Lead = 1;                                                       % EEG Lead/Electrode
             Voltage_V = vertcat(Data.EEG{:});
-            Time_total = info.NumDataRecords*info.DataRecordDuration;    	% Total of data points in the EEG trace
-            Time_seg = Time_total/length(Voltage_V);                    	% Converts frequency to time in seconds
-            Voltage_mV = Voltage_V * 1000;                              	% Converts EEG voltage values from volts to mV
+            Time_total = info.NumDataRecords*info.DataRecordDuration;       % Total of data points in the EEG trace
+            Time_seg = Time_total/length(Voltage_V);                        % Converts frequency to time in seconds
+            Voltage_mV = Voltage_V * 1000;                                  % Converts EEG voltage values from volts to mV
             ABS_Voltage_mV = abs(Voltage_mV);                               % Finds the absolute value of EDF data
 
-            
-% This block of code AUTOMATICALLY determines the baseline, lower threshold, and upper threshold values
-            Start_Value = 100;                                              %uV
-            Tally = 0;                                                      %Placeholder variable   
-            Percent = 0;                                                    %Placeholder variable
-            while Percent < 0.97 && Start_Value <= 130                      % 0.97 = the set percentage of data points that MUST be below threshold value
-                for a = 1:2000000                                           % Scan window for determing lower threshold (1 step = 0.002 seconds)
-                    if ABS_Voltage_mV(a) < Start_Value/1000                 % Logic loop for determining threshold 
-                        Tally = Tally + 1;                                  % Not relevant
-                    else
-                    end
-                end
-                Start_Value = Start_Value + 5;                              % Increases the lower threshold by 5 uV each pass through the loop
-                Percent = Tally/a;                                          % Current percentage of data points that are below the threhsold value
-                Tally = 0;                                                  % Not relevant
-            end
-            
-            fprintf('The baseline EEG value was set at %.0f µV \n', Start_Value-5)
-            Baseline = Start_Value-5;                                       % This is the baseline value in uV
-            Lower_Threshold = 2*Baseline;                                   % This is the lower threshold in uV (2X the baseline)
-                        
+            Lower_Threshold = input('What is the lower threshold for spike detection given in µV? ');   % Allows user to set lower threshold manually (normally 200 uV)
+            Baseline = Lower_Threshold/2;
             Upper_Threshold = 1500;                                         % This is the upper threshold, set at 1500 uV
             Lower_Threshold_Adj = Lower_Threshold*0.001;                    % This converts the lower threshold to mV
             Upper_Threshold_Adj = Upper_Threshold*0.001;                    % This converts the upper threshold to mV
@@ -94,7 +75,7 @@ for k = 1 : numberOfFolders
                     DateTime(1,i) = datenum(DateTime_Vector(1,position(i)));% Saves date/time for each peak
                 else
                     peaks(1,i) = 0;                                         % Disregards peaks < 2X baseline or > 1500 uV
-                    location(1,i) = 0;                                      % Disregards location of peaks that dont satisfy above criteria
+                    location(1,i) = 0;                                      % Disregards location of peaks that dont satisfy criteria
                     DateTime(1,i) = datenum(DateTime_Vector(1,position(i))); % Saves date and time of false peaks
                 end
             end      
@@ -191,7 +172,7 @@ for k = 1 : numberOfFolders
             w = size(Seizure_Record,1);                                 % Determines the number of seizures saved
             x = false(w,1);                                             % Logic statement placeholder variable
             for y=1:w
-                if Seizure_Record(y,2) == 0                             % Removes single spikes that aren't part of a seizure
+                if Seizure_Record(y,2) == 0                             % Removes single spikes that aren't part of an seizure
                     x(y) = true;                                        % Logic statement for removing false seizures
                 end
             end
@@ -205,8 +186,8 @@ for k = 1 : numberOfFolders
                 end
             end
             Seizure_Record(h,:) = [];                                   % Saves Seizure_Record variable with ONLY TRUE seizures
-                
-                
+            
+            
 % Plotting EEG Data - Seconds Time Scale -----------------------------------------------------------------------
             Time = transpose(0:Time_seg:Time_total);                    % Creates a time variable in seconds
             figure                                                      % Creates a new figure window
@@ -251,7 +232,7 @@ for k = 1 : numberOfFolders
             title(strcat(Timeframe_String,"-", 'Hour EEG Data for Mouse'," ", Mouse_Number,' - Minutes Time Scale'))    % Creates a title for the figure
             
             for t = 1:length(Seizure_Record(:,1))                       % Loop that plots seizure bars on the figure
-                plot([Seizure_Record(t,3)/60 Seizure_Record(t,4)/60],[1.0 1.0], 'r', 'LineWidth', 4)    % Plots red bars above true seizures on the plot
+                plot([Seizure_Record(t,3)/60 Seizure_Record(t,4)/60],[1.0 1.0], 'r', 'LineWidth', 4)    % Plots red bars above true seizures on plot
             end
             yline(Lower_Threshold/1000, 'r-')                           % Creates a red line at the lower threshold value (positive)
             yline(-Lower_Threshold/1000, 'r-')                          % Creates a red line at the lower threshold value (negative)
@@ -306,10 +287,10 @@ for k = 1 : numberOfFolders
     Summary_Table = table(Summary_Names,Summary_Data(:,1),Summary_Data(:,2),Summary_Data(:,3),'VariableNames',varNames_summary); % Generates a table of summary information
     filename2 = strcat('EEG Data Summary Sheet.xlsx');                          % Creates a filename for the excel summary sheet
     writetable(Summary_Table,filename2,'Sheet',1,'Range','B2')                  % Exports and saves excel summary sheet
-    %disp(Summary_Table)                                                        % Displays summary data to the screen
+    disp(Summary_Table)                                                         % Displays summary data to the screen
     
-    clear                                                                       % Clears the Worksapce variables for next mouse to be analyzed
-    clc                                                                         % Clears the Command Window for next mouse to be analyzed
-    delete(findall(0));                                                         % Deletes all figures from MEMORY, even if they dont show
-    % Suppress the previous line (313) if you want figures to show, also refer to line 22
+    %clear                                                                      % Clears the Worksapce variables for next mouse to be analyzed
+    %clc                                                                        % Clears the Command Window for next mouse to be analyzed
+    %delete(findall(0));                                                        % Deletes all figures from MEMORY, even if they dont show
+    % Suppress the previous line (294) if you want figures to show, also refer to line 22
 end
